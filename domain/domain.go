@@ -2,6 +2,7 @@ package domain
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -107,6 +108,18 @@ func unique[T comparable](in []T) ([]T, error) {
 	return result, nil
 }
 
+// remove will return an array with element removed
+func remove[T comparable](in []T, element T) ([]T, error) {
+	result := []T{}
+	for _, t := range in {
+		if t == element {
+			continue
+		}
+		result = append(result, t)
+	}
+	return result, nil
+}
+
 // List will print out the git ignore file
 func (a *Application) List() error {
 	data, err := a.getGitIgnoreFileData()
@@ -121,24 +134,52 @@ func (a *Application) List() error {
 
 // Add will add a pattern to gitignore file
 func (a *Application) Add(pattern string) error {
-	var data []string
+	return a.work(pattern, func(strings []string, s string) ([]string, error) {
+		if strings == nil {
+			return nil, errors.New("nil line data provided")
+		}
+		strings = append(strings, pattern)
+		return strings, nil
+	})
+}
+
+// Remove will remove one pattern from git ignore
+func (a *Application) Remove(pattern string) error {
+	return a.work(pattern, func(strings []string, s string) ([]string, error) {
+		if strings == nil {
+			return nil, errors.New("nil line data provided")
+		}
+		return remove(strings, pattern)
+	})
+}
+
+// work will perform operation, worker is a function passed doing the actual work while
+// this is a wrapper doing the common stuff such as reading and writing the file
+func (a *Application) work(pattern string, worker func([]string, string) ([]string, error)) error {
+	var lines []string
 	var err error
-	var newValue []string
+
+	if pattern == "" {
+		return errors.New("no pattern provided")
+	}
 
 	file := a.getGitIgnorePath()
 
 	_, err = os.Stat(file)
 	if err == nil {
-		data, err = a.getGitIgnoreFileData()
+		lines, err = a.getGitIgnoreFileData()
 		if err != nil {
 			return err
 		}
-		newValue = append(data, pattern)
 	} else {
-		newValue = []string{pattern}
+		lines = []string{}
+	}
+	lines, err = worker(lines, pattern)
+	if err != nil {
+		return err
 	}
 	if a.unique {
-		newValue, err = unique(newValue)
+		lines, err = unique(lines)
 		if err != nil {
 			return err
 		}
@@ -149,7 +190,7 @@ func (a *Application) Add(pattern string) error {
 		return err
 	}
 
-	for _, line := range newValue {
+	for _, line := range lines {
 		_, _ = f.WriteString(fmt.Sprintln(line))
 	}
 	return f.Close()

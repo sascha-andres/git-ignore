@@ -39,18 +39,21 @@ func run() error {
 	}
 
 	verbs := flag.GetVerbs()
-	if len(verbs) == 0 {
-		remainingArgs := flag.NArg()
-		if remainingArgs != 1 {
-			return errors.New("you need to specify exactly one additional argument (pattern to ignore)")
+	pattern := ""
+	remainingArgs := flag.NArg()
+	if remainingArgs != 1 {
+		return errors.New("you need to specify exactly one additional argument (pattern to ignore)")
+	}
+	pattern = flag.Arg(0)
+
+	if len(verbs) > 0 {
+		switch verbs[0] {
+		case "list":
+			return a.List()
+		case "remove":
+			return a.Remove(pattern)
 		}
-		pattern := flag.Arg(0)
-		return a.Add(pattern)
 	}
 
-	switch verbs[0] {
-	case "list":
-		return a.List()
-	}
-	return errors.New("unknown operation")
+	return a.Add(pattern)
 }
